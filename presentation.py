@@ -13,9 +13,13 @@ def _():
     import mosqlient as mq
     import datetime as dt
     import pandas as pd
+    import numpy as np
     import altair as alt
-
-    return alt, dt, mo, mq, pd
+    import pywt
+    import matplotlib.pyplot as plt
+    import matplotlib as mpl
+    from matplotlib import cm, colors
+    return alt, cm, colors, dt, mo, mq, np, pd, plt, pywt
 
 
 @app.cell
@@ -141,8 +145,6 @@ def _(alt):
 
         # Combinando os gráficos
         plot = (line+areas).properties(
-            width=800,
-            height=400,
             title=f"Casos de dengue ao longo do tempo por nível de alerta em {city}",
         )
         plot = plot.configure_mark(
@@ -187,29 +189,126 @@ def _(cities, dengue, gen_tsplot, mo, start, state, state_wide, stop):
 
 
 @app.cell
-def _(alt, dengue):
-    alt.Chart(dengue).mark_bar(
-        cornerRadiusTopLeft=2,
-        cornerRadiusTopRight=2
-    ).encode(
-        x='date:T',
-        y='casos:Q',
-        color=alt.Color(
-                    field="nivel",
-                    scale={
-                        'domain':[1,2,3,4],
-                        'range':['green','yellow','orange','red']
-                    },
-                    title="Alerta"
-                ),
-    )
+def _():
+    # alt.Chart(dengue).mark_bar(
+    #     cornerRadiusTopLeft=2,
+    #     cornerRadiusTopRight=2
+    # ).encode(
+    #     x='date:T',
+    #     y='casos:Q',
+    #     color=alt.Color(
+    #                 field="nivel",
+    #                 scale={
+    #                     'domain':[1,2,3,4],
+    #                     'range':['green','yellow','orange','red']
+    #                 },
+    #                 title="Alerta"
+    #             ),
+    # )
 
     return
 
 
 @app.cell
-def _(dengue):
-    dengue.info()
+def _():
+    ## Seasonality
+    return
+
+
+@app.cell
+def _(cm, colors, np, plt):
+    def plot_polar(df, disease, city):
+        if city != 'all':
+            df = df[df.municipio_nome==city]
+        df.loc[:,'EW'] = [int(str(s)[-2:]) for s in df.SE]
+        df.loc[:,'year'] = [int(str(s)[:-2]) for s in df.SE]
+        df2 = df.sort_values('date')
+        df2['ew_r'] = df2.EW*(2*np.pi/52.)
+        cmap = cm.jet((df2.year-df.year.min())/(df2.year.max()-df.year.min()))
+        fig, [ax1, ax2] = plt.subplots(1,2,subplot_kw={'projection': 'polar'}, figsize=(13,6))
+        ax1.set_xticklabels(np.linspace(1,52,9, dtype=int))
+        ax1.set_title(f'Casos de {disease} entre 2010 e 2025 - {city}')
+        ax2.set_xticklabels(np.linspace(1,52,9, dtype=int))
+        ax2.set_yscale("log")
+        ax2.set_title(f'Log(Casos) de {disease} entre 2010 e 2025 - {city}')
+
+        ax1.plot(df2.ew_r,df2.casos,color='gray',lw=1, alpha=0.3)
+        ax2.plot(df2.ew_r,df2.casos,color='gray',lw=1, alpha=0.3)
+        sct1 = ax1.scatter(df2.ew_r,df2.casos,s=10, c=cmap);
+        sct2 = ax2.scatter(df2.ew_r,df2.casos,s=10, c=cmap);
+        # cb = plt.colorbar(sct, ax=ax)
+        cb2 = fig.colorbar(cm.ScalarMappable(colors.Normalize(df2.year.min(),df2.year.max(), True), cmap=cm.jet), ax=ax2)
+
+        cb2.set_ticklabels([str(y) for y in range(df2.year.min(), df2.year.max()+1)])
+        cb2.set_ticks(ticks=np.linspace(0,1, df2.year.max()-df2.year.min()+1), labels=[str(y) for y in range(df2.year.min(), df2.year.max()+1)])
+        # cb2 = fig.colorbar(cm.ScalarMappable(colors.Normalize(2010,2026, True), cmap=cm.jet), ax=ax2)
+        # cb2.set_ticks(ticks=np.linspace(0,1, 16), labels=[str(y) for y in range(df2.year.min(), df2.year.max()+1)])
+
+
+        ax1.set_xlabel('Semanas');
+        ax2.set_xlabel('Semanas')
+        return fig
+    return (plot_polar,)
+
+
+@app.cell
+def _(cities, dengue, plot_polar):
+    plot_polar(dengue,'dengue', cities.value)
+    return
+
+
+@app.cell
+def _():
+    ## Preprocessing
+    return
+
+
+@app.cell
+def _(dengue, mo, pywt):
+
+    wvlt='coif4'
+    coeffs = pywt.wavedec(dengue.casos/dengue.casos.max(), wvlt)
+    # Set a threshold to nullify smaller coefficients (assumed to be noise)
+    threshold = mo.ui.slider(start=0.1, stop=1, step=0.001, value=0.211)
+
+    return coeffs, threshold, wvlt
+
+
+@app.cell
+def _(alt):
+    def plot_denoised(signal, denoised_signal
+                     ):
+        signal['denoised'] = denoised_signal
+        line = (
+            alt.Chart(signal)
+            .mark_line(point=True)
+            .encode(x="date:T", y="casos:Q")
+        ).properties(title="Noisy Series")
+        line2 = (
+            alt.Chart(signal)
+            .mark_line(point=True)
+            .encode(x="date:T", y="denoised:Q")
+        ).properties(title="Denoised Series", color='green')
+    
+    
+        return line|line2
+    return (plot_denoised,)
+
+
+@app.cell
+def _(coeffs, dengue, mo, plot_denoised, pywt, threshold, wvlt):
+
+    coeffs_thresholded = [pywt.threshold(c, threshold.value, mode='soft') for c in coeffs]
+    denoised_signal = pywt.waverec(coeffs_thresholded, wvlt)*dengue.casos.max()
+    mo.md(
+    f'''
+    ### Denoising  the series
+    **Threshold:** {threshold} {threshold.value}
+
+    {mo.ui.altair_chart(plot_denoised(dengue, denoised_signal))}
+    '''
+    )
+
     return
 
 

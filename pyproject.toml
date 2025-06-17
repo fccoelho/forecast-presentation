@@ -13,6 +13,7 @@ dependencies = [
     "mosqlient>=1.9.3",
     "pyarrow>=20.0.0",
     "python-dotenv>=1.1.0",
+    "pywavelets>=1.8.0",
     "ruff>=0.11.13",
     "vega>=4.1.0",
 ]
