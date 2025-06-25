@@ -4,26 +4,20 @@ Dashboard interativo para análise e previsão de casos de dengue no Brasil util
 
 ## Pré-requisitos
 
-- Python 3.10+
-- [UV](https://github.com/astral-sh/uv) (recomendado) ou pip
-- [marimo](https://marimo.io/) instalado globalmente
+- Python 3.12+
+
 
 ## Configuração
 
-1. Primeiro, crie e ative um ambiente virtual com UV:
+1. Primeiro, crie e ative um ambiente virtual com UV e instale as dependências:
 
 ```bash
-uv venv .venv
+uv sync
 source .venv/bin/activate.fish
 ```
 
-2. Instale as dependências:
 
-```bash
-uv pip install -r requirements.txt
-```
-
-3. Crie um arquivo `.env` com sua chave de API:
+2. Crie um arquivo `.env` com sua chave de API:
 
 ```bash
 echo "MOSQLIMATE_API_KEY=sua_chave_aqui" > .env
@@ -33,6 +27,12 @@ echo "MOSQLIMATE_API_KEY=sua_chave_aqui" > .env
 
 ```bash
 marimo run presentation.py
+```
+
+Ou para editar:
+
+```
+marimo edit presentation.py
 ```
 
 ## Funcionalidades
@@ -48,23 +48,8 @@ marimo run presentation.py
 
 ## Dados
 
-Os dados são obtidos através da API do [InfoDengue/MoSquimate](https://info.dengue.mat.br/).
+Os dados são obtidos através da API do [MoSquimate](https://api.mosqlimate.org/).
 
-## Desenvolvimento
-
-Para contribuir com o projeto:
-
-1. Instale as dependências de desenvolvimento:
-
-```bash
-uv pip install -r requirements-dev.txt
-```
-
-2. Execute os testes:
-
-```bash
-pytest
-```
 
 ## Licença
 
