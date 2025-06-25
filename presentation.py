@@ -1,3 +1,23 @@
+"""
+Interactive presentation for dengue fever data analysis and forecasting.
+
+Features:
+- Data visualization of dengue cases by state/city
+- Seasonal pattern analysis
+- Time series denoising using wavelets
+- Forecasting with local linear trend models
+
+Requires:
+- marimo
+- mosqlient
+- pandas
+- numpy
+- altair
+- matplotlib
+- pywavelets
+- statsmodels
+"""
+
 import marimo
 
 __generated_with = "0.13.15"
@@ -9,18 +29,28 @@ app = marimo.App(
 
 @app.cell
 def _():
+    # Core libraries
     import marimo as mo
-    import mosqlient as mq
     import datetime as dt
+    
+    # Data handling
     import pandas as pd
     import numpy as np
+    
+    # Visualization
     import altair as alt
-    import pywt
     import matplotlib.pyplot as plt
     import matplotlib as mpl
     from matplotlib import cm, colors
+    
+    # Time series analysis
+    import pywt
     import statsmodels.api as sm
     from scipy.stats import norm
+    
+    # Data API
+    import mosqlient as mq
+    
     return alt, cm, colors, dt, mo, mq, np, pd, plt, pywt, sm
 
 
@@ -28,8 +58,17 @@ def _():
 def _(mo):
     mo.md(
         r"""
-    # Dengue Forecasting
-    ### Flávio Codeço Coelho
+    # Dengue Forecasting Dashboard
+    ### Análise e previsão de casos de dengue no Brasil
+    
+    **Autor:** Flávio Codeço Coelho  
+    **Data:** 25/06/2025
+    
+    Este dashboard interativo permite:
+    - Visualizar séries temporais de casos de dengue
+    - Analisar padrões sazonais
+    - Aplicar técnicas de denoising
+    - Realizar previsões de curto prazo
     """
     )
     return
@@ -85,6 +124,17 @@ def _(mo):
 def _(api_key, mo, mq, pd, ufs):
     @mo.cache
     def fetch_dengue_data(start, stop, uf):
+        """
+        Fetch dengue case data from InfoDengue API.
+        
+        Args:
+            start (str): Start date in YYYY-MM-DD format
+            stop (str): End date in YYYY-MM-DD format 
+            uf (str): Brazilian state name
+            
+        Returns:
+            pd.DataFrame: DataFrame with dengue cases data
+        """
         df = mq.get_infodengue(
             api_key=api_key,
             disease="dengue",
