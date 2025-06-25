@@ -19,7 +19,9 @@ def _():
     import matplotlib.pyplot as plt
     import matplotlib as mpl
     from matplotlib import cm, colors
-    return alt, cm, colors, dt, mo, mq, np, pd, plt, pywt
+    import statsmodels.api as sm
+    from scipy.stats import norm
+    return alt, cm, colors, dt, mo, mq, np, pd, plt, pywt, sm
 
 
 @app.cell
@@ -278,7 +280,7 @@ def _(dengue, mo, pywt):
 def _(alt):
     def plot_denoised(signal, denoised_signal
                      ):
-        signal['denoised'] = denoised_signal
+        signal['denoised'] = denoised_signal[:len(signal)]
         line = (
             alt.Chart(signal)
             .mark_line(point=True)
@@ -289,8 +291,8 @@ def _(alt):
             .mark_line(point=True)
             .encode(x="date:T", y="denoised:Q")
         ).properties(title="Denoised Series", color='green')
-    
-    
+
+
         return line|line2
     return (plot_denoised,)
 
@@ -309,6 +311,128 @@ def _(coeffs, dengue, mo, plot_denoised, pywt, threshold, wvlt):
     '''
     )
 
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(r"""## Simple Forecast""")
+    return
+
+
+@app.cell
+def _(np, sm):
+    class LocalLinearTrend(sm.tsa.statespace.MLEModel):
+        def __init__(self, endog):
+            # Model order
+            k_states = k_posdef = 2
+
+            # Initialize the statespace
+            super(LocalLinearTrend, self).__init__(
+                endog,
+                k_states=k_states,
+                k_posdef=k_posdef,
+                initialization="approximate_diffuse",
+                loglikelihood_burn=k_states,
+            )
+
+            # Initialize the matrices
+            self.ssm["design"] = np.array([1, 0])
+            self.ssm["transition"] = np.array([[1, 1], [0, 1]])
+            self.ssm["selection"] = np.eye(k_states)
+
+            # Cache some indices
+            self._state_cov_idx = ("state_cov",) + np.diag_indices(k_posdef)
+
+        @property
+        def param_names(self):
+            return ["sigma2.measurement", "sigma2.level", "sigma2.trend"]
+
+        @property
+        def start_params(self):
+            return [np.std(self.endog)] * 3
+
+        def transform_params(self, unconstrained):
+            return unconstrained**2
+
+        def untransform_params(self, constrained):
+            return constrained**0.5
+
+        def update(self, params, *args, **kwargs):
+            params = super(LocalLinearTrend, self).update(params, *args, **kwargs)
+
+            # Observation covariance
+            self.ssm["obs_cov", 0, 0] = params[0]
+
+            # State covariance
+            self.ssm[self._state_cov_idx] = params[1:]
+    return (LocalLinearTrend,)
+
+
+@app.cell
+def _(LocalLinearTrend, dengue, np):
+    dengue['log_casos'] = np.log(dengue.casos)
+    # Setup the model
+    mod = LocalLinearTrend(dengue.set_index('date')["log_casos"])
+
+    # Fit it using MLE (recall that we are fitting the three variance parameters)
+    res = mod.fit(disp=False)
+    print(res.summary())
+    return (res,)
+
+
+@app.cell
+def _(res):
+    # Perform prediction and forecasting
+    predict = res.get_prediction()
+    forecast = res.get_forecast(20)
+
+    return forecast, predict
+
+
+@app.cell
+def _(dengue):
+    dengue
+    return
+
+
+@app.cell
+def _(forecast):
+    forecast
+    return
+
+
+@app.cell
+def _(dengue, forecast, np, plt, predict):
+    def plot_forecast():
+        fig, ax = plt.subplots(figsize=(10, 4))
+
+        # Plot the results
+        dengue.set_index('date')["log_casos"].plot(ax=ax, style="k.", label="Observations")
+        predict.predicted_mean.plot(ax=ax, label="One-step-ahead Prediction")
+        predict_ci = predict.conf_int(alpha=0.05)
+        predict_index = np.arange(len(predict_ci))
+        ax.fill_between(
+            predict_index[2:], predict_ci.iloc[2:, 0], predict_ci.iloc[2:, 1], alpha=0.1
+        )
+    
+        forecast.predicted_mean.plot(ax=ax, style="r", label="Forecast")
+        forecast_ci = forecast.conf_int()
+        forecast_index = np.arange(len(predict_ci), len(predict_ci) + len(forecast_ci))
+        ax.fill_between(
+            forecast_index, forecast_ci.iloc[:, 0], forecast_ci.iloc[:, 1], alpha=0.1
+        )
+    
+        # Cleanup the image
+        ax.set_ylim((4, 8))
+        legend = ax.legend(loc="lower left");
+        return fig
+    return (plot_forecast,)
+
+
+@app.cell
+def _(plot_forecast):
+    plot_forecast()
     return
 
 
