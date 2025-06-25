@@ -48,7 +48,7 @@ marimo edit presentation.py
 
 ## Dados
 
-Os dados são obtidos através da API do [MoSquimate](https://api.mosqlimate.org/).
+Os dados são obtidos através da API do [Mosquimate](https://api.mosqlimate.org/).
 
 
 ## Licença
