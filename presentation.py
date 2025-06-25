@@ -32,25 +32,25 @@ def _():
     # Core libraries
     import marimo as mo
     import datetime as dt
-    
+
     # Data handling
     import pandas as pd
     import numpy as np
-    
+
     # Visualization
     import altair as alt
     import matplotlib.pyplot as plt
     import matplotlib as mpl
     from matplotlib import cm, colors
-    
+
     # Time series analysis
     import pywt
     import statsmodels.api as sm
     from scipy.stats import norm
-    
+
     # Data API
     import mosqlient as mq
-    
+
     return alt, cm, colors, dt, mo, mq, np, pd, plt, pywt, sm
 
 
@@ -60,11 +60,12 @@ def _(mo):
         r"""
     # Dengue Forecasting Dashboard
     ### Análise e previsão de casos de dengue no Brasil
-    
+
     **Autor:** Flávio Codeço Coelho  
     **Data:** 25/06/2025
-    
+
     Este dashboard interativo permite:
+
     - Visualizar séries temporais de casos de dengue
     - Analisar padrões sazonais
     - Aplicar técnicas de denoising
@@ -126,12 +127,12 @@ def _(api_key, mo, mq, pd, ufs):
     def fetch_dengue_data(start, stop, uf):
         """
         Fetch dengue case data from InfoDengue API.
-        
+
         Args:
             start (str): Start date in YYYY-MM-DD format
             stop (str): End date in YYYY-MM-DD format 
             uf (str): Brazilian state name
-            
+
         Returns:
             pd.DataFrame: DataFrame with dengue cases data
         """
@@ -366,7 +367,12 @@ def _(coeffs, dengue, mo, plot_denoised, pywt, threshold, wvlt):
 
 @app.cell
 def _(mo):
-    mo.md(r"""## Simple Forecast""")
+    mo.md(
+        r"""
+    ## Simple Forecast
+    To exemplify how we can approach the forecast of the dengue inference time series, we will fit a state-space model to it.
+    """
+    )
     return
 
 
@@ -420,14 +426,21 @@ def _(np, sm):
 
 
 @app.cell
-def _(LocalLinearTrend, dengue, np):
+def _(LocalLinearTrend, dengue, mo, np):
     dengue['log_casos'] = np.log(dengue.casos)
     # Setup the model
     mod = LocalLinearTrend(dengue.set_index('date')["log_casos"])
 
     # Fit it using MLE (recall that we are fitting the three variance parameters)
     res = mod.fit(disp=False)
-    print(res.summary())
+    # print(res.summary())
+    mo.md(f'''
+    When we run this regression model, we get:
+
+    ```
+    {res.summary()}
+    ```
+    ''')
     return (res,)
 
 
@@ -441,14 +454,8 @@ def _(res):
 
 
 @app.cell
-def _(dengue):
-    dengue
-    return
-
-
-@app.cell
-def _(forecast):
-    forecast
+def _():
+    # dengue
     return
 
 
@@ -465,14 +472,14 @@ def _(dengue, forecast, np, plt, predict):
         ax.fill_between(
             predict_index[2:], predict_ci.iloc[2:, 0], predict_ci.iloc[2:, 1], alpha=0.1
         )
-    
+
         forecast.predicted_mean.plot(ax=ax, style="r", label="Forecast")
         forecast_ci = forecast.conf_int()
         forecast_index = np.arange(len(predict_ci), len(predict_ci) + len(forecast_ci))
         ax.fill_between(
             forecast_index, forecast_ci.iloc[:, 0], forecast_ci.iloc[:, 1], alpha=0.1
         )
-    
+
         # Cleanup the image
         ax.set_ylim((4, 8))
         legend = ax.legend(loc="lower left");
