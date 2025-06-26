@@ -20,7 +20,7 @@ Requires:
 
 import marimo
 
-__generated_with = "0.13.15"
+__generated_with = "0.14.7"
 app = marimo.App(
     width="medium",
     layout_file="layouts/presentation.slides.json",
@@ -490,6 +490,31 @@ def _(dengue, forecast, np, plt, predict):
 @app.cell
 def _(plot_forecast):
     plot_forecast()
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(
+        r"""
+    ## Covariates and Causal Relations
+    Now let's explore the relationship of incidence with climate covariates
+    """
+    )
+    return
+
+
+@app.cell
+def _():
+    from ftplib import FTP
+    return
+
+
+@app.cell
+def _():
+    ftp_host = 'info.dengue.mat.br'
+    ftp_user = 'anonymous'
+    # create a connection with this FTP host and download the file 'data_sprint_2025/climate_csv_gz'. AI!
     return
 
 
