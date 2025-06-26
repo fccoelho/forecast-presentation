@@ -507,21 +507,23 @@ def _(mo):
 @app.cell
 def _():
     from ftplib import FTP
-    return
+    return (FTP,)
 
 
 @app.cell
-def _():
+def _(FTP):
     ftp_host = 'info.dengue.mat.br'
     ftp_user = 'anonymous'
-    
+
     # Connect to FTP and download climate data
     with FTP(ftp_host) as ftp:
         ftp.login(user=ftp_user)
         ftp.cwd('data_sprint_2025')
+        # print(ftp.nlst())
         with open('climate_data.csv.gz', 'wb') as f:
-            ftp.retrbinary('RETR climate_csv_gz', f.write)
-    
+            #here, open the retrieved file in a pandas dataframe. AI!
+            ftp.retrbinary('RETR climate.csv.gz', f.write)
+
     return
 
 
