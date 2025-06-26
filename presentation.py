@@ -521,8 +521,11 @@ def _(FTP):
         ftp.cwd('data_sprint_2025')
         # print(ftp.nlst())
         with open('climate_data.csv.gz', 'wb') as f:
-            #here, open the retrieved file in a pandas dataframe. AI!
             ftp.retrbinary('RETR climate.csv.gz', f.write)
+    
+    # Read the downloaded gzipped CSV into a pandas DataFrame
+    import pandas as pd
+    climate_df = pd.read_csv('climate_data.csv.gz', compression='gzip')
 
     return
 
