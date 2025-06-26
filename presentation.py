@@ -65,6 +65,7 @@ def _():
         colors,
         dt,
         duckdb,
+        f_correlation,
         mo,
         mq,
         np,
@@ -572,18 +573,28 @@ def _(climate, dengue, pd):
 @app.cell
 def _(alt, inc_clim):
     covs = ['log_casos', 'temp_min', 'precip_min', 'rel_humid_min', 'thermal_range', 'rainy_days']
-    alt.Chart(inc_clim).mark_circle().encode(
-        alt.X(alt.repeat("column"), type='quantitative'),
-        alt.Y(alt.repeat("row"), type='quantitative'),
-        color='Origin:N'
-    ).properties(
-        width=60,
-        height=60
-    ).repeat(
-        row=covs,
-        column=covs
-    ).interactive()
-    return
+    scats = []
+    lins = []
+    for i in covs[1:]:
+        scats.append(alt.Chart(inc_clim).mark_circle().encode(
+            x='log_casos:Q',
+            y= alt.Y(f'{i}:Q'),
+            color='Origin:N').interactive())
+        lins.append(
+            alt.Chart(inc_clim).mark_line(
+            color='red',
+            opacity=0.3,
+            size=2
+        ).transform_window(
+            rolling_mean=f'mean({i})',
+            frame=[-1, 1]
+        ).encode(
+            x='log_casos:Q',
+            y='rolling_mean:Q'
+        )
+        )
+    scats[0]+lins[0] | scats[1]+lins[1] | scats[2]+lins[2] | scats[3]+lins[3] | scats[4]+lins[4]
+    return (covs,)
 
 
 @app.cell
@@ -592,35 +603,39 @@ def _():
 
 
 @app.cell
-def _(f_correlation, inc_clim, mo, np, pd):
-    covs = ['log_casos', 'temp_min', 'precip_min', 'rel_humid_min', 'thermal_range', 'rainy_days']
-    
+def _(covs, f_correlation, inc_clim, mo, np, pd):
+
+
     # Calculate correlations
     linear_corrs = []
     f_corrs = []
-    pairs = []
-    
-    for i in range(len(covs)):
-        for j in range(i+1, len(covs)):
-            x = inc_clim[covs[i]].values
-            y = inc_clim[covs[j]].values
-            valid = ~np.isnan(x) & ~np.isnan(y)
-            x = x[valid]
-            y = y[valid]
-            
-            pairs.append(f"{covs[i]} vs {covs[j]}")
-            linear_corrs.append(np.corrcoef(x, y)[0,1])
-            f_corrs.append(f_correlation(x.reshape(-1,1), y.reshape(-1,1)))
-    
+
+
+    for j in covs[1:]:
+        x = inc_clim['log_casos'].values
+        y = inc_clim[j].values
+        valid = ~np.isnan(x) & ~np.isnan(y)
+        x = x[valid]
+        y = y[valid]
+
+        linear_corrs.append(np.corrcoef(x, y)[0,1])
+        f_corrs.append(f_correlation(x.reshape(-1,1), y.reshape(-1,1)))
+
     # Create dataframe
     corr_df = pd.DataFrame({
-        'Variable Pair': pairs,
+        'Variable': covs[1:],
         'Linear Correlation': linear_corrs,
         'F-Correlation': f_corrs
     })
-    
+
     # Display table
     mo.ui.table(corr_df, label='Correlation Analysis')
+    return
+
+
+@app.cell
+def _():
+    return
 
 
 if __name__ == "__main__":

@@ -15,7 +15,7 @@ Dashboard interativo para análise e previsão de casos de dengue no Brasil util
 uv sync
 source .venv/bin/activate.fish
 ```
-
+or, if you use bash just `source .venv/bin/activate`
 
 2. Crie um arquivo `.env` com sua chave de API:
 
