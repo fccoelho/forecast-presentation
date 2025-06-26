@@ -34,10 +34,12 @@ def _():
     import datetime as dt
     import os
     from ftplib import FTP
+    import warnings
 
     # Data handling
     import pandas as pd
     import numpy as np
+    import duckdb
 
     # Visualization
     import altair as alt
@@ -50,17 +52,42 @@ def _():
     import statsmodels.api as sm
     from scipy.stats import norm
 
+    # Causal Analysis
+    from lingam.utils import f_correlation
+
     # Data API
     import mosqlient as mq
 
-    return FTP, alt, cm, colors, dt, mo, mq, np, pd, plt, pywt, sm
+    return (
+        FTP,
+        alt,
+        cm,
+        colors,
+        dt,
+        duckdb,
+        mo,
+        mq,
+        np,
+        os,
+        pd,
+        plt,
+        pywt,
+        sm,
+        warnings,
+    )
+
+
+@app.cell
+def _(warnings):
+    warnings.filterwarnings('always')
+    return
 
 
 @app.cell
 def _(mo):
     mo.md(
         r"""
-    # Dengue Forecasting Dashboard
+    # Dengue Forecasting Explorer
     ### Análise e previsão de casos de dengue no Brasil
 
     **Autor:** Flávio Codeço Coelho  
@@ -84,8 +111,7 @@ def _(mo):
 
 
 @app.cell
-def _(mo):
-    import os
+def _(mo, os):
     from dotenv import load_dotenv
 
     # Load environment variables from .env file
@@ -120,7 +146,8 @@ def _(mo):
         "Tocantins": "TO"
     }
     state = mo.ui.dropdown(options=list(ufs.keys()), value='Distrito Federal')
-    return api_key, state, ufs
+    geocode_dict = {}
+    return api_key, geocode_dict, state, ufs
 
 
 @app.cell
@@ -212,8 +239,9 @@ def _(alt):
 
 
 @app.cell
-def _(fetch_dengue_data, start, state, stop):
+def _(fetch_dengue_data, geocode_dict, start, state, stop):
     dengue = fetch_dengue_data(start.value, stop.value, state.value)
+    geocode_dict.update({k:v for k,v in zip (dengue.municipio_nome, dengue.municipio_geocodigo)})
     return (dengue,)
 
 
@@ -507,22 +535,55 @@ def _(mo):
 
 
 @app.cell
-def _(FTP):
+def _(FTP, cities, dengue, duckdb, geocode_dict, gz, os):
     ftp_host = 'info.dengue.mat.br'
     ftp_user = 'anonymous'
 
-    # Connect to FTP and download climate data
-    with FTP(ftp_host) as ftp:
-        ftp.login(user=ftp_user)
-        ftp.cwd('data_sprint_2025')
-        # print(ftp.nlst())
-        with open('climate_data.csv.gz', 'wb') as f:
-            ftp.retrbinary('RETR climate.csv.gz', f.write)
 
-    # Read the downloaded climate data into a pandas DataFrame
-    import pandas as pd
-    climate_df = pd.read_csv('climate_data.csv.gz', compression='gzip')
-    return climate_df
+    # Connect to FTP and download climate data
+    if os.path.exists('climate.csv.gz'):
+        climate = duckdb.sql(f"select * from climate.csv.gz where geocode='{geocode_dict[cities.value]}' and epiweek>={dengue.SE.min()} and epiweek<={dengue.SE.max()};").df()
+    else:
+        with FTP(ftp_host) as ftp:
+            ftp.login(user=ftp_user)
+            ftp.cwd('data_sprint_2025')
+            # print(ftp.nlst())
+            with open('climate.csv.gz', 'wb') as f:
+                #here, open the retrieved file in a pandas dataframe. AI!
+                ftp.retrbinary('RETR climate.csv.gz', f.write)
+                climate = duckdb.sql(f"select * from climate.csv.gz where geocode='{geocode_dict[cities.value]}' and epiweek>={dengue.epiweek.min()} and epiweek<={dengue.epiweek.max()};").df()
+    climate
+    return (climate,)
+
+
+@app.cell
+def _(mo):
+    mo.md(r"""### Let's start with some basic correlations""")
+    return
+
+
+@app.cell
+def _(climate, dengue, pd):
+    inc_clim = pd.merge(climate, dengue[['casos', 'log_casos', 'SE']], left_on='epiweek', right_on='SE')
+    inc_clim
+    return (inc_clim,)
+
+
+@app.cell
+def _(alt, inc_clim):
+    covs = ['log_casos', 'temp_min', 'precip_min', 'rel_humid_min', 'thermal_range', 'rainy_days']
+    alt.Chart(inc_clim).mark_circle().encode(
+        alt.X(alt.repeat("column"), type='quantitative'),
+        alt.Y(alt.repeat("row"), type='quantitative'),
+        color='Origin:N'
+    ).properties(
+        width=60,
+        height=60
+    ).repeat(
+        row=covs,
+        column=covs
+    ).interactive()
+    return
 
 
 @app.cell
