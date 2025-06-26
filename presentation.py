@@ -591,5 +591,37 @@ def _():
     return
 
 
+@app.cell
+def _(f_correlation, inc_clim, mo, np, pd):
+    covs = ['log_casos', 'temp_min', 'precip_min', 'rel_humid_min', 'thermal_range', 'rainy_days']
+    
+    # Calculate correlations
+    linear_corrs = []
+    f_corrs = []
+    pairs = []
+    
+    for i in range(len(covs)):
+        for j in range(i+1, len(covs)):
+            x = inc_clim[covs[i]].values
+            y = inc_clim[covs[j]].values
+            valid = ~np.isnan(x) & ~np.isnan(y)
+            x = x[valid]
+            y = y[valid]
+            
+            pairs.append(f"{covs[i]} vs {covs[j]}")
+            linear_corrs.append(np.corrcoef(x, y)[0,1])
+            f_corrs.append(f_correlation(x.reshape(-1,1), y.reshape(-1,1)))
+    
+    # Create dataframe
+    corr_df = pd.DataFrame({
+        'Variable Pair': pairs,
+        'Linear Correlation': linear_corrs,
+        'F-Correlation': f_corrs
+    })
+    
+    # Display table
+    mo.ui.table(corr_df, label='Correlation Analysis')
+
+
 if __name__ == "__main__":
     app.run()
