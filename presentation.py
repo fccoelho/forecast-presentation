@@ -20,7 +20,7 @@ Requires:
 
 import marimo
 
-__generated_with = "0.14.7"
+__generated_with = "0.14.17"
 app = marimo.App(
     width="medium",
     layout_file="layouts/presentation.slides.json",
@@ -35,6 +35,8 @@ def _():
     import os
     from ftplib import FTP
     import warnings
+
+    warnings.filterwarnings('always')
 
     # Data handling
     import pandas as pd
@@ -74,14 +76,7 @@ def _():
         plt,
         pywt,
         sm,
-        warnings,
     )
-
-
-@app.cell
-def _(warnings):
-    warnings.filterwarnings('always')
-    return
 
 
 @app.cell
@@ -195,7 +190,7 @@ def _(dt, mo):
 
 @app.cell
 def _(alt):
-    def gen_tsplot(df, city='all'):
+    def gen_tsplot(df, sn, city='all'):
         if city == "all":
             df  = df.groupby('date').agg({'casos':'sum'})
         else:
@@ -228,7 +223,7 @@ def _(alt):
 
         # Combinando os gráficos
         plot = (line+areas).properties(
-            title=f"Casos de dengue ao longo do tempo por nível de alerta em {city}",
+            title=f"Casos de dengue ao longo do tempo por nível de alerta - {city}, {sn}",
         )
         plot = plot.configure_mark(
             tooltip=alt.TooltipContent(
@@ -257,9 +252,10 @@ def _(dengue, mo):
 @app.cell
 def _(cities, dengue, gen_tsplot, mo, start, state, state_wide, stop):
     cn  = cities.value
+    state_name = state.value
     if state_wide.value:
         cn="all"
-    tsp = mo.ui.altair_chart(gen_tsplot(dengue, cn))
+    tsp = mo.ui.altair_chart(gen_tsplot(dengue,sn=state_name, city=cn))
     mo.md(
     f"""
     ## Selecting our dataset:
@@ -365,14 +361,14 @@ def _(alt):
         signal['denoised'] = denoised_signal[:len(signal)]
         line = (
             alt.Chart(signal)
-            .mark_line(point=True)
+            .mark_line(point=False)
             .encode(x="date:T", y="casos:Q")
         ).properties(title="Noisy Series")
         line2 = (
             alt.Chart(signal)
-            .mark_line(point=True)
+            .mark_line(point=False)
             .encode(x="date:T", y="denoised:Q")
-        ).properties(title="Denoised Series", color='green')
+        ).properties(title="Wavelet-Denoised Series", color='green')
 
 
         return line|line2
@@ -387,12 +383,75 @@ def _(coeffs, dengue, mo, plot_denoised, pywt, threshold, wvlt):
     mo.md(
     f'''
     ### Denoising  the series
+    Wavelet family: {wvlt}
+
     **Threshold:** {threshold} {threshold.value}
 
     {mo.ui.altair_chart(plot_denoised(dengue, denoised_signal))}
     '''
     )
 
+    return
+
+
+@app.cell
+def _(alt):
+    def plot_smoothed(signal, order, ew=False):
+        """
+        Plots the original signal and a smoothed version of it using either
+        a simple moving average or an exponentially weighted moving average.
+
+        Args:
+            signal (pd.DataFrame): DataFrame containing 'date' and 'casos' columns.
+            order (int): The window size for the moving average.
+            ew (bool, optional): If True, uses exponentially weighted moving average.
+                                  If False, uses simple rolling mean. Defaults to False.
+
+        Returns:
+            alt.Chart: An Altair chart object displaying both the original and
+                       smoothed time series.
+        """
+        if ew:
+            signal['casos_smoothed'] = signal.casos.ewm(span=order, adjust=True).mean()
+        else:
+            signal['casos_smoothed'] = signal.casos.rolling(order).mean()
+        line = (
+            alt.Chart(signal)
+            .mark_line(point=False)
+            .encode(x="date:T", y="casos:Q")
+        ).properties(title="Original casos")
+        line2 = (
+            alt.Chart(signal)
+            .mark_line(point=False)
+            .encode(x="date:T", y="casos_smoothed:Q")
+        ).properties(title=f"MA({order})", color='green')
+
+        return line | line2
+        
+
+    return (plot_smoothed,)
+
+
+@app.cell
+def _(mo):
+    ew = mo.ui.checkbox(value=False)
+    order = mo.ui.slider(start=1,stop=10, step=1)
+    return ew, order
+
+
+@app.cell
+def _(dengue, ew, mo, order, plot_smoothed):
+    mo.md(
+        f"""
+    Smoothing the series through moving average.
+
+    **Order:** {order} {order.value}
+
+    **Exponential Weighting:** {ew}
+
+    {mo.ui.altair_chart(plot_smoothed(dengue, order=order.value, ew=ew.value))}
+    """
+    )
     return
 
 
@@ -630,6 +689,11 @@ def _(covs, f_correlation, inc_clim, mo, np, pd):
 
     # Display table
     mo.ui.table(corr_df, label='Correlation Analysis')
+    return
+
+
+@app.cell
+def _():
     return
 
 
